@@ -1,0 +1,19 @@
+name: Fleet bucket validate
+description: Validate Fleet bucket.json and bucket/*.json listings
+inputs:
+  path:
+    description: Bucket repository root (directory containing bucket.json)
+    required: false
+    default: "."
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    - name: Validate listings
+      shell: bash
+      env:
+        FLEET_BUCKET_ROOT: ${{ inputs.path }}
+      run: python3 "${{ github.action_path }}/../scripts/validate-listings.py"

@@ -1,0 +1,33 @@
+name: Fleet bucket pin
+description: Pin architecture.linux-amd64 url + hash on bucket listings from SHA256SUMS
+inputs:
+  path:
+    description: Bucket repository root (directory containing bucket.json)
+    required: false
+    default: "."
+  sums:
+    description: Path to SHA256SUMS file, or a directory containing SHA256SUMS
+    required: true
+  tag:
+    description: Release tag used to build architecture.*.url (from checkver.github / homepage)
+    required: false
+    default: ""
+  dry-run:
+    description: If true, print pins without writing files
+    required: false
+    default: "false"
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    - name: Pin listing hashes
+      shell: bash
+      env:
+        FLEET_BUCKET_ROOT: ${{ inputs.path }}
+        PIN_SUMS: ${{ inputs.sums }}
+        PIN_TAG: ${{ inputs.tag }}
+        PIN_DRY_RUN: ${{ inputs.dry-run }}
+      run: python3 "${{ github.action_path }}/../scripts/pin-listings.py"

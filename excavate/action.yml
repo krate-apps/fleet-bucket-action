@@ -1,0 +1,70 @@
+name: Fleet bucket excavate
+description: Bump Fleet bucket listings from GitHub Releases and commit one update per listing
+inputs:
+  path:
+    description: Bucket repository root (directory containing bucket.json)
+    required: false
+    default: "."
+  github-token:
+    description: Token for GitHub Releases API (defaults to GITHUB_TOKEN env)
+    required: false
+    default: ""
+  dry-run:
+    description: If true, print updates without writing files or committing
+    required: false
+    default: "false"
+  git-name:
+    description: git user.name for excavator commits (from repo secret)
+    required: false
+    default: ""
+  git-email:
+    description: git user.email for excavator commits (from repo secret)
+    required: false
+    default: ""
+  push:
+    description: If true, push commits after excavating (ignored on dry-run)
+    required: false
+    default: "true"
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    - name: Excavate releases
+      shell: bash
+      env:
+        FLEET_BUCKET_ROOT: ${{ inputs.path }}
+        GITHUB_TOKEN: ${{ inputs.github-token != '' && inputs.github-token || github.token }}
+        EXCAVATOR_DRY_RUN: ${{ inputs.dry-run }}
+      run: python3 "${{ github.action_path }}/../scripts/excavator.py"
+    - name: Commit listing updates
+      if: inputs.dry-run != 'true'
+      shell: bash
+      working-directory: ${{ inputs.path }}
+      env:
+        GIT_NAME: ${{ inputs.git-name }}
+        GIT_EMAIL: ${{ inputs.git-email }}
+        DO_PUSH: ${{ inputs.push }}
+      run: |
+        set -euo pipefail
+        mapfile -t files < <(git diff --name-only -- 'bucket/*.json')
+        if [ "${#files[@]}" -eq 0 ]; then
+          echo "No excavator changes"
+          exit 0
+        fi
+        # Prefer secrets; fall back to the Actions bot so excavate works without GIT_* secrets.
+        GIT_NAME="${GIT_NAME:-github-actions[bot]}"
+        GIT_EMAIL="${GIT_EMAIL:-41898282+github-actions[bot]@users.noreply.github.com}"
+        git config user.name "$GIT_NAME"
+        git config user.email "$GIT_EMAIL"
+        for file in "${files[@]}"; do
+          name=$(basename "$file" .json)
+          version=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['version'])" "$file")
+          git add -- "$file"
+          git commit -m "${name}: Update to version ${version}"
+        done
+        if [ "${DO_PUSH}" = "true" ]; then
+          git push
+        fi

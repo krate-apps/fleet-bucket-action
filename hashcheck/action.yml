@@ -1,0 +1,19 @@
+name: Fleet bucket hashcheck
+description: Download architecture URLs and verify sha256 hashes for Fleet bucket listings
+inputs:
+  path:
+    description: Bucket repository root (directory containing bucket.json)
+    required: false
+    default: "."
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+    - name: Verify architecture hashes
+      shell: bash
+      env:
+        FLEET_BUCKET_ROOT: ${{ inputs.path }}
+      run: python3 "${{ github.action_path }}/../scripts/hashcheck.py"
